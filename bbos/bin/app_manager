@@ -1,0 +1,17 @@
+#!/usr/bin/env python3
+import sys
+from pathlib import Path
+
+# Add the project root to path so we can import bbos
+script_dir = Path(__file__).parent.parent.absolute()
+sys.path.insert(0, str(script_dir))
+
+from bbos.app_manager import AppManager
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Usage: app_manager [app_dirs]")
+        sys.exit(1)
+    app_dirs = [Path(p) for p in sys.argv[1:]]
+    app_manager = AppManager(app_dirs)
+    app_manager.start()

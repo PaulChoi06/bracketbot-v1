@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BracketBot — WebXR uplink</title>
+<style>
+:root {
+  --text-primary: #000000;
+  --text-secondary: #252525;
+  --text-muted: #4a4a4a;
+  --border-light: #e8e8e8;
+  --border-medium: #d8d8d8;
+  --bg-surface: #fbfbfb;
+  --background: #ffffff;
+  --brand-orange: #dc6100;
+  --deep-green: #005a21;
+  --primary: #222222;
+  --primary-foreground: #ffffff;
+  --destructive: #dc2626;
+  --radius: 3px;
+  --font-sans: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 20px;
+  color-scheme: light;
+  -webkit-font-smoothing: antialiased;
+}
+button { transition: all 120ms ease; font-family: inherit; }
+::selection { background: color-mix(in srgb, var(--primary) 18%, transparent); }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-medium); border-radius: 3px; }
+
+.page { padding: 20px; max-width: 960px; margin: 0 auto; }
+.mono {
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum" on, "lnum" on;
+}
+.label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 18px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  color: var(--text-muted);
+}
+h1 { font-size: 20px; line-height: 1.15; font-weight: 500; letter-spacing: 0.005em; margin: 0; }
+h2 {
+  font-size: 16px; font-weight: 500; margin: 0 0 12px;
+  padding-bottom: 8px; border-bottom: 1px solid var(--border-light);
+}
+.sub { margin: 2px 0 0; font-size: 12px; color: var(--text-muted); }
+section { margin-bottom: 32px; }
+
+.strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 16px 0; }
+.cell { padding: 12px; border: 1px solid var(--border-medium); border-radius: var(--radius); }
+.cell .v { font-family: var(--font-mono); font-size: 13px; margin-top: 2px; color: var(--text-primary); }
+.dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 6px; vertical-align: middle; background: var(--border-medium); }
+.dot.up { background: var(--deep-green); }
+.dot.warn { background: var(--brand-orange); }
+.dot.down { background: var(--destructive); }
+
+.row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+button.primary {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border: 0; border-radius: var(--radius);
+  background: var(--primary); color: var(--primary-foreground);
+  font-size: 13px; font-weight: 500; cursor: pointer;
+}
+button.primary:hover { opacity: 0.9; }
+button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
+button.secondary {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border: 1px solid var(--border-medium); border-radius: var(--radius);
+  background: var(--background); color: var(--text-secondary);
+  font-size: 13px; font-weight: 500; cursor: pointer;
+}
+button.secondary:hover { background: var(--bg-surface); }
+
+.alert {
+  display: flex; gap: 8px; padding: 8px 12px; border-radius: var(--radius);
+  font-size: 13px; margin-bottom: 16px;
+}
+.alert.warn { border: 1px solid color-mix(in srgb, var(--brand-orange) 30%, transparent); background: color-mix(in srgb, var(--brand-orange) 5%, transparent); color: var(--brand-orange); }
+.alert.err { border: 1px solid #fecaca; background: #fef2f2; color: #b91c1c; }
+.alert[hidden] { display: none; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+table { width: 100%; border-collapse: collapse; }
+.panel { border: 1px solid var(--border-medium); border-radius: var(--radius); overflow: hidden; }
+.panel > .head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 12px; background: var(--bg-surface); border-bottom: 1px solid var(--border-light);
+}
+th { text-align: left; padding: 8px 12px; }
+td { padding: 6px 12px; font-size: 13px; border-bottom: 1px solid var(--border-light); }
+tr:last-child td { border-bottom: 0; }
+td.k { color: var(--text-muted); width: 92px; }
+td.v { font-family: var(--font-mono); color: var(--text-primary); word-break: break-all; }
+.badge {
+  display: inline-flex; padding: 2px 6px; border-radius: var(--radius);
+  font-size: 11px; font-weight: 500; background: #f3f4f6; color: #374151;
+}
+.badge.on { background: color-mix(in srgb, var(--deep-green) 10%, transparent); color: var(--deep-green); }
+pre {
+  margin: 0; padding: 12px; font-family: var(--font-mono); font-size: 12px;
+  line-height: 18px; color: var(--text-secondary); overflow-x: auto;
+  max-height: 260px; overflow-y: auto; white-space: pre-wrap; word-break: break-all;
+}
+#log { max-height: 160px; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="row" style="justify-content: space-between; align-items: flex-start;">
+    <div>
+      <h1>quest daemon <span class="mono" style="color: var(--text-muted); font-size: 14px;">[webxr]</span></h1>
+      <p class="sub">Streams raw WebXR head, grip and gamepad data from this headset to <span class="mono">quest.controllers</span>.</p>
+    </div>
+    <div class="row">
+      <button class="secondary" id="reconnect">Reconnect</button>
+      <button class="primary" id="enter" disabled>Enter XR <span class="mono">[→]</span></button>
+    </div>
+  </div>
+
+  <div class="alert warn" id="warn" hidden></div>
+  <div class="alert err" id="err" hidden></div>
+
+  <div class="strip">
+    <div class="cell"><div class="label">Uplink</div><div class="v" id="s-ws"><span class="dot"></span>connecting</div></div>
+    <div class="cell"><div class="label">Session</div><div class="v" id="s-xr"><span class="dot"></span>idle</div></div>
+    <div class="cell"><div class="label">Send rate</div><div class="v" id="s-hz">0 Hz</div></div>
+    <div class="cell"><div class="label">Packets</div><div class="v" id="s-n">0</div></div>
+  </div>
+
+  <section>
+    <h2>Raw WebXR</h2>
+    <div class="grid">
+      <div class="panel">
+        <div class="head"><span class="label">Head — viewer pose</span><span class="badge" id="b-head">no pose</span></div>
+        <table><tbody id="t-head"></tbody></table>
+      </div>
+      <div class="panel">
+        <div class="head"><span class="label">Left — grip + gamepad</span><span class="badge" id="b-left">absent</span></div>
+        <table><tbody id="t-left"></tbody></table>
+      </div>
+      <div class="panel">
+        <div class="head"><span class="label">Right — grip + gamepad</span><span class="badge" id="b-right">absent</span></div>
+        <table><tbody id="t-right"></tbody></table>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Wire packet</h2>
+    <div class="panel">
+      <div class="head"><span class="label">Last frame sent over /ws</span><span class="label" id="b-bytes">0 B</span></div>
+      <pre id="wire">—</pre>
+    </div>
+  </section>
+
+  <section>
+    <h2>Log</h2>
+    <div class="panel"><pre id="log"></pre></div>
+  </section>
+
+</div>
+
+<script>
+"use strict";
+
+// Match the daemon's 20 ms publish loop; the display runs faster than this.
+const SEND_MS = 20;
+const UI_MS = 100;
+// Stop sending if the socket is backed up: fresh poses beat queued ones.
+const MAX_BUFFERED = 64 * 1024;
+
+const $ = (id) => document.getElementById(id);
+const round = (v) => Math.round(v * 1e6) / 1e6;
+
+let ws = null;
+let session = null;
+let refSpace = null;
+let gl = null;
+let sources = { left: null, right: null };
+let seq = 0;
+let sent = 0;
+let lastSend = 0;
+let lastUI = 0;
+let rateT = 0;
+let rateN = 0;
+let lastPacket = null;
+let lastBytes = 0;
+
+function log(msg) {
+  const el = $("log");
+  const t = new Date().toTimeString().slice(0, 8);
+  el.textContent = `${t}  ${msg}\n` + el.textContent;
+  if (el.textContent.length > 4000) el.textContent = el.textContent.slice(0, 4000);
+}
+
+function setDot(el, cls, text) {
+  el.innerHTML = `<span class="dot ${cls}"></span>${text}`;
+}
+
+function alertBox(id, msg) {
+  const el = $(id);
+  if (!msg) { el.hidden = true; return; }
+  el.textContent = msg;
+  el.hidden = false;
+}
+
+// ---------------------------------------------------------------- uplink ---
+function connect() {
+  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+  ws = new WebSocket(`wss://${location.host}/ws`);
+  ws.onopen = () => { setDot($("s-ws"), "up", "connected"); log("uplink open"); };
+  ws.onclose = () => {
+    setDot($("s-ws"), "down", "offline");
+    log("uplink closed, retrying in 1s");
+    setTimeout(connect, 1000);
+  };
+  ws.onerror = () => setDot($("s-ws"), "down", "error");
+  ws.onmessage = (e) => {
+    let m;
+    try { m = JSON.parse(e.data); } catch (_) { return; }
+    if (m.type === "haptic") pulse(m);
+  };
+}
+
+function send(packet) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  if (ws.bufferedAmount > MAX_BUFFERED) return;
+  const s = JSON.stringify(packet);
+  lastBytes = s.length;
+  ws.send(s);
+  sent++;
+  rateN++;
+}
+
+// --------------------------------------------------------------- haptics ---
+function pulse(m) {
+  const hands = m.hand === 0 ? ["left"] : m.hand === 1 ? ["right"] : ["left", "right"];
+  const amp = Math.min(1, Math.max(0, m.amplitude));
+  const ms = Math.max(1, Math.round((m.duration || 0.08) * 1000));
+  if (amp <= 0) return;
+  for (const h of hands) {
+    const gp = sources[h] && sources[h].gamepad;
+    const act = gp && gp.hapticActuators && gp.hapticActuators[0];
+    if (act && act.pulse) act.pulse(amp, ms);
+  }
+}
+
+// ------------------------------------------------------------ xr session ---
+function xform(t) {
+  const p = t.position, o = t.orientation;
+  return {
+    pos: [round(p.x), round(p.y), round(p.z)],
+    quat: [round(o.x), round(o.y), round(o.z), round(o.w)],
+  };
+}
+
+// Everything here is verbatim WebXR: local-floor grip poses and the
+// xr-standard gamepad arrays. The daemon owns every frame conversion.
+function sample(frame) {
+  const packet = { seq: seq++, t: Math.round(performance.now()), head: null, left: null, right: null };
+  const viewer = frame.getViewerPose(refSpace);
+  if (viewer) packet.head = xform(viewer.transform);
+
+  sources = { left: null, right: null };
+  for (const src of session.inputSources) {
+    const hand = src.handedness;
+    if (hand !== "left" && hand !== "right") continue;
+    sources[hand] = src;
+    const gp = src.gamepad;
+    const pose = src.gripSpace ? frame.getPose(src.gripSpace, refSpace) : null;
+    const grip = pose ? xform(pose.transform) : null;
+    packet[hand] = {
+      pos: grip ? grip.pos : null,
+      quat: grip ? grip.quat : null,
+      buttons: gp ? gp.buttons.map((b) => round(b.value)) : [],
+      pressed: gp ? gp.buttons.map((b) => (b.pressed ? 1 : 0)) : [],
+      axes: gp ? gp.axes.map(round) : [],
+      profiles: src.profiles || [],
+    };
+  }
+  return packet;
+}
+
+function onXRFrame(t, frame) {
+  session.requestAnimationFrame(onXRFrame);
+
+  const layer = session.renderState.baseLayer;
+  gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
+  gl.clearColor(0, 0, 0, 0);        // Transparent: passthrough stays visible.
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+  if (t - lastSend < SEND_MS) return;
+  lastSend = t;
+  lastPacket = sample(frame);
+  send(lastPacket);
+  if (t - lastUI >= UI_MS) { lastUI = t; render(); }
+}
+
+async function enterXR() {
+  try {
+    const ar = await navigator.xr.isSessionSupported("immersive-ar");
+    const mode = ar ? "immersive-ar" : "immersive-vr";
+    session = await navigator.xr.requestSession(mode, { requiredFeatures: ["local-floor"] });
+
+    const canvas = document.createElement("canvas");
+    gl = canvas.getContext("webgl", { xrCompatible: true, alpha: true });
+    await gl.makeXRCompatible();
+    session.updateRenderState({ baseLayer: new XRWebGLLayer(session, gl) });
+    refSpace = await session.requestReferenceSpace("local-floor");
+
+    session.addEventListener("end", () => {
+      session = null;
+      setDot($("s-xr"), "", "idle");
+      $("enter").disabled = false;
+      log("session ended");
+    });
+
+    $("enter").disabled = true;
+    setDot($("s-xr"), "up", mode.replace("immersive-", ""));
+    log(`session started (${mode}, local-floor)`);
+    session.requestAnimationFrame(onXRFrame);
+  } catch (e) {
+    alertBox("err", `Could not start the session: ${e.message}`);
+    log(`session failed: ${e.message}`);
+    $("enter").disabled = false;
+  }
+}
+
+// -------------------------------------------------------------- rendering ---
+function rows(tbody, pairs) {
+  tbody.innerHTML = pairs
+    .map(([k, v]) => `<tr><td class="k">${k}</td><td class="v">${v}</td></tr>`)
+    .join("");
+}
+
+function fmt(a, dp) {
+  if (!a) return "—";
+  return "[" + a.map((v) => v.toFixed(dp === undefined ? 3 : dp)).join(", ") + "]";
+}
+
+function render() {
+  const p = lastPacket;
+  const now = performance.now();
+  if (now - rateT >= 1000) {
+    $("s-hz").textContent = `${Math.round((rateN * 1000) / (now - rateT))} Hz`;
+    rateT = now;
+    rateN = 0;
+  }
+  $("s-n").textContent = sent.toLocaleString();
+
+  const head = p && p.head;
+  $("b-head").textContent = head ? "tracked" : "no pose";
+  $("b-head").className = "badge" + (head ? " on" : "");
+  rows($("t-head"), [
+    ["position", head ? fmt(head.pos) : "—"],
+    ["orientation", head ? fmt(head.quat) : "—"],
+  ]);
+
+  for (const hand of ["left", "right"]) {
+    const h = p && p[hand];
+    const badge = $(`b-${hand}`);
+    badge.textContent = h ? (h.pos ? "tracked" : "no pose") : "absent";
+    badge.className = "badge" + (h && h.pos ? " on" : "");
+    rows($(`t-${hand}`), [
+      ["position", h ? fmt(h.pos) : "—"],
+      ["orientation", h ? fmt(h.quat) : "—"],
+      ["buttons", h ? fmt(h.buttons, 2) : "—"],
+      ["pressed", h ? fmt(h.pressed, 0) : "—"],
+      ["axes", h ? fmt(h.axes, 2) : "—"],
+    ]);
+  }
+
+  if (p) $("wire").textContent = JSON.stringify(p);   // Literally the bytes sent.
+  $("b-bytes").textContent = `${lastBytes} B`;
+}
+
+// ------------------------------------------------------------------ boot ---
+$("enter").onclick = enterXR;
+$("reconnect").onclick = () => { if (ws) ws.close(); connect(); };
+
+if (!navigator.xr) {
+  alertBox("warn", "No WebXR in this browser — open this page in the Quest browser to stream. The uplink and raw view still work here.");
+} else {
+  navigator.xr.isSessionSupported("immersive-vr").then((vr) => {
+    return navigator.xr.isSessionSupported("immersive-ar").then((ar) => {
+      if (vr || ar) { $("enter").disabled = false; }
+      else alertBox("warn", "WebXR is present but no immersive session is supported on this device.");
+    });
+  });
+}
+
+connect();
+render();
+setInterval(() => { if (!session) render(); }, UI_MS * 5);
+log("page loaded");
+</script>
+</body>
+</html>

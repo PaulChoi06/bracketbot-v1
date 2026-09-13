@@ -1,0 +1,27 @@
+[project]
+name = "bbos-daemon-arm-right"
+version = "0.0.0"
+requires-python = "==3.11.*"
+dependencies = [
+  "bbos",
+  "numpy==2.3.5",
+  "posix-ipc==1.3.2",
+  "scipy==1.17.1",
+  "evdev==1.7.1",
+  "feetech-servo-sdk==1.0.0",
+  "cmeel-tinyxml2==10.0.0",
+  "cmeel-urdfdom==4.0.1",
+  "pin==3.8.0",
+  "yourdfpy==0.0.60",
+]
+
+[tool.uv.sources]
+bbos = { path = "../../..", editable = true }
+
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = []
+packages = []

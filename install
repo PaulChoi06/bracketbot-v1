@@ -1,0 +1,274 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO="git@github.com:Bracket-Bot-Inc/bbcore.git"
+CHECKOUT_REF=""
+ONLY=()
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --checkout)
+            if [ "$#" -lt 2 ]; then
+                echo "$1 requires a branch or commit" >&2
+                exit 2
+            fi
+            CHECKOUT_REF="$2"
+            shift 2
+            ;;
+        --only)
+            shift
+            while [ "$#" -gt 0 ] && [[ "$1" != --* ]]; do
+                ONLY+=("$1")
+                shift
+            done
+            ;;
+        *)
+            echo "Unknown argument: $1" >&2
+            exit 2
+            ;;
+    esac
+done
+
+checkout_bbcore_ref() {
+    local ref="$1"
+    [ -n "$ref" ] || return 0
+    echo "[+] Checking out bbcore ref: $ref"
+    if git -C "$HOME" show-ref --verify --quiet "refs/heads/$ref"; then
+        git -C "$HOME" checkout "$ref"
+    elif git -C "$HOME" show-ref --verify --quiet "refs/remotes/origin/$ref"; then
+        git -C "$HOME" checkout -B "$ref" "origin/$ref"
+    elif git -C "$HOME" rev-parse --verify --quiet "$ref^{commit}" >/dev/null; then
+        git -C "$HOME" checkout --detach "$ref"
+    elif git -C "$HOME" ls-remote --exit-code --heads origin "$ref" >/dev/null 2>&1; then
+        git -C "$HOME" fetch origin "$ref:refs/remotes/origin/$ref"
+        git -C "$HOME" checkout -B "$ref" "origin/$ref"
+    elif git -C "$HOME" fetch origin "$ref"; then
+        if git -C "$HOME" rev-parse --verify --quiet "FETCH_HEAD^{commit}" >/dev/null; then
+            git -C "$HOME" checkout --detach FETCH_HEAD
+        else
+            echo "Could not resolve bbcore ref: $ref" >&2
+            exit 1
+        fi
+    else
+        echo "Could not resolve bbcore ref: $ref" >&2
+        exit 1
+    fi
+}
+
+if [ -d "$HOME/.git" ] && git -C "$HOME" remote get-url origin 2>/dev/null | grep -q bbcore; then
+    echo "[+] bbcore already installed, continuing..."
+else
+    echo "[+] Installing bbcore..."
+    git clone "$REPO" /tmp/bbcore.$$ &&
+    mv /tmp/bbcore.$$/* /tmp/bbcore.$$/.[!.]* "$HOME/" &&
+    rm -rf /tmp/bbcore.$$
+fi
+checkout_bbcore_ref "$CHECKOUT_REF"
+
+echo "[+] Done."
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$SCRIPT_DIR"
+if [ -d "$HOME/bbos/bbos/daemons" ]; then
+    ROOT_DIR="$HOME"
+fi
+
+PACKAGE_DIR="$ROOT_DIR/bbos/bbos"
+BBOS_DIR="$ROOT_DIR/bbos"
+DAEMONS_DIR="$PACKAGE_DIR/daemons"
+SYSTEMD_DIR="/etc/systemd/system"
+CURRENT_USER="$(id -un)"
+APP_DIRS="$HOME/bbapps"
+
+has_only() {
+    local name="$1"
+    if [ "${#ONLY[@]}" -eq 0 ]; then
+        return 0
+    fi
+    local item
+    for item in "${ONLY[@]}"; do
+        if [ "$item" = "$name" ]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+append_if_not_exists() {
+    local line="$1"
+    local file="$2"
+    touch "$file"
+    if grep -Fxq "$line" "$file"; then
+        return
+    fi
+    echo "Appending to $file"
+    printf "\n%s\n" "$line" >> "$file"
+}
+
+ensure_interactive_guard() {
+    local file="$1"
+    touch "$file"
+    if grep -q 'case \$- in' "$file"; then
+        return
+    fi
+    echo "Adding interactive guard to $file"
+    cat >> "$file" <<'EOF'
+
+case $- in
+    *i*) ;;
+      *) return;;
+esac
+EOF
+}
+
+insert_before_interactive_guard() {
+    local line="$1"
+    local file="$2"
+    local tmp
+    touch "$file"
+    ensure_interactive_guard "$file"
+    if grep -Fxq "$line" "$file"; then
+        return
+    fi
+    tmp="$(mktemp)"
+    echo "Inserting before interactive guard in $file"
+    awk -v line="$line" '
+        BEGIN { inserted = 0 }
+        !inserted && $0 ~ /^case \$- in/ {
+            print line
+            print ""
+            inserted = 1
+        }
+        { print }
+    ' "$file" > "$tmp"
+    mv "$tmp" "$file"
+}
+
+build_daemon() {
+    local path="$1"
+    echo -e "\033[1;32mBuilding $(basename "$path")...\033[0m"
+    if [ -f "$path/devenv.nix" ]; then
+        (cd "$path" && devenv shell --no-reload -- true)
+    elif [ -f "$path/default.nix" ]; then
+        local cmd=(nix-build "$path/default.nix" -o "$path/result")
+        if [ "$(basename "$path")" = "manager" ]; then
+            cmd+=(--argstr daemonsPath "$DAEMONS_DIR" --argstr bbosRoot "$BBOS_DIR")
+        fi
+        "${cmd[@]}"
+    else
+        echo "No devenv.nix or default.nix found in $path" >&2
+        return 1
+    fi
+}
+
+add_paths_to_shell_profiles() {
+    local joined
+    local IFS=:
+    joined="$*"
+    local export_line="export PATH=$joined:\$PATH"
+    insert_before_interactive_guard "$export_line" "$HOME/.bashrc"
+    append_if_not_exists "$export_line" "$HOME/.profile"
+}
+
+install_service() {
+    local daemon="$1"
+    local type="$2"
+    local as_user="$3"
+    local exec_start="$4"
+    local env_value="$5"
+    local service_file="$SYSTEMD_DIR/$daemon.service"
+    local user_block=""
+    local restart_block=""
+    if [ "$as_user" = "true" ]; then
+        user_block="User=$CURRENT_USER
+Group=$CURRENT_USER"
+    fi
+    if [ "$type" = "simple" ]; then
+        restart_block="Restart=always
+RestartSec=1"
+    fi
+    sudo tee "$service_file" >/dev/null <<EOF
+[Unit]
+Description=$daemon Service
+After=network.target NetworkManager.service
+
+[Service]
+$user_block
+Type=$type
+ExecStart=$exec_start
+RemainAfterExit=yes
+$restart_block
+Environment=$env_value
+[Install]
+WantedBy=multi-user.target
+EOF
+    sudo systemctl daemon-reload
+    sudo systemctl enable "$(basename "$service_file")"
+    sudo systemctl start "$(basename "$service_file")" || true
+    if [ "$as_user" = "true" ]; then
+        echo "[+] $daemon.service installed; will run as $CURRENT_USER."
+    else
+        echo "[+] $daemon.service installed; will run as root."
+    fi
+}
+
+install_services() {
+    local daemon_path
+    if has_only hotspot; then
+        daemon_path="$DAEMONS_DIR/hotspot"
+        install_service hotspot oneshot false "$daemon_path/result/bin/hotspot" ""
+    fi
+    if has_only manager; then
+        daemon_path="$DAEMONS_DIR/manager"
+        install_service manager simple true "$daemon_path/result/bin/manager $DAEMONS_DIR" ""
+    fi
+    if has_only app_manager; then
+        install_service app_manager simple true "/bin/bash -c -l 'uv run $BBOS_DIR/bin/app_manager $APP_DIRS'" "PATH=/home/$CURRENT_USER/.local/bin:/usr/local/bin:/usr/bin"
+    fi
+}
+
+run_bbos_install() {
+    local add_to_path=()
+    local path
+    if [ "${#ONLY[@]}" -eq 0 ]; then
+        for path in "$DAEMONS_DIR"/*; do
+            [ -d "$path" ] || continue
+            if [ -f "$path/default.nix" ] || [ -f "$path/devenv.nix" ]; then
+                build_daemon "$path"
+                if [ -f "$path/default.nix" ]; then
+                    add_to_path+=("$path/result/bin")
+                fi
+            else
+                echo "Skipping $path because it doesn't have a default.nix or devenv.nix"
+            fi
+        done
+    else
+        for name in "${ONLY[@]}"; do
+            path="$DAEMONS_DIR/$name"
+            if [ ! -d "$path" ]; then
+                echo "Unknown daemon: $name" >&2
+                exit 1
+            fi
+            if [ -f "$path/default.nix" ] || [ -f "$path/devenv.nix" ]; then
+                build_daemon "$path"
+                if [ -f "$path/default.nix" ]; then
+                    add_to_path+=("$path/result/bin")
+                fi
+            else
+                echo "Skipping $path because it doesn't have a default.nix or devenv.nix"
+            fi
+        done
+    fi
+
+    install_services
+
+    if [ "${#add_to_path[@]}" -gt 0 ]; then
+        add_paths_to_shell_profiles "${add_to_path[@]}"
+    fi
+
+    insert_before_interactive_guard "enable -n help" "$HOME/.bashrc"
+    append_if_not_exists "enable -n help" "$HOME/.profile"
+    echo "Done!"
+}
+
+run_bbos_install

@@ -1,0 +1,27 @@
+[project]
+name = "bbos-daemon-camera"
+version = "0.0.0"
+requires-python = "==3.11.*"
+dependencies = [
+  "bbos",
+  "numpy==2.4.6",
+  "posix-ipc==1.3.2",
+  "opencv-python==4.13.0.92",
+  "v4l2-python3==0.3.5",
+  "PyTurboJPEG==2.2.0",
+  "fastapi==0.136.3",
+  "uvicorn==0.48.0",
+  "qrcode==8.2",
+  "pillow==12.2.0",
+]
+
+[tool.uv.sources]
+bbos = { path = "../../..", editable = true }
+
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = []
+packages = []

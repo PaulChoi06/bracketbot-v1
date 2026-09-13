@@ -1,0 +1,102 @@
+**/.data/*
+**/config.yaml
+*.avi
+*.mp4
+*.env
+.venv*
+.devenv/
+*openvino*
+yolo8n*
+*.safetensor
+*.txt
+mnt
+*.img
+*.xz
+*.pt
+*ncnn_model
+*.torchscript
+*.engine
+*.engine*tmp
+*.bin
+!bbos/daemons/base/firmware/od-firmware/ODriveFirmware.bin
+*.param
+*.DS_Store
+.build*
+*.wav
+result
+log
+*.rrd
+*.pem
+*cache*/
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+build/
+venv/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+**/.DS_Store
+._*
+**/._*
+.AppleDouble
+.LSOverride
+.Spotlight-V100
+.Trashes
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.log
+
+# Daemon stop markers (temporary, not tracked)
+.stopped
+.full-setup-reset-required
+
+# Image files
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+*.tiff
+*.webp
+
+# Camera calibration
+**/calibration/
+**/calibration/captures/*
+**/calibration/stereo_calibration_fisheye.yaml
+
+# Per-robot data
+*.calibration.json
+
+# Backups
+*.bak*
+
+# Claude state
+.claude/
+
+!bbos/daemons/remote_session/wavs/*.wav

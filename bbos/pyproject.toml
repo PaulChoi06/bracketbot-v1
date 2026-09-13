@@ -1,0 +1,76 @@
+[build-system]
+requires = ["setuptools>=64", "wheel", "numpy"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bbos"
+version = "0.0.1"
+description = "BracketBot OS"
+authors = [{ name = "Raghava Uppuluri" }]
+urls = { Homepage = "https://github.com/Bracket-Bot-Inc/bbcore" }
+dependencies = [
+  "posix_ipc",
+  "numpy",
+]
+requires-python = ">=3.10"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["bbos*"]
+namespaces = true
+
+[tool.setuptools.package-data]
+"bbos" = [
+  "*.so",
+  "**/*.html",
+  "**/*.nix",
+  "**/*.so",
+]
+
+[tool.setuptools.exclude-package-data]
+"bbos" = [
+  "**/*.c",
+  "**/._*",
+  "**/*.bak",
+  "daemons/*/.venv/**",
+  "daemons/*/venv/**",
+  "daemons/*/result/**",
+  "daemons/__pycache__/**",
+  "daemons/*/__pycache__/**",
+]
+
+[project.optional-dependencies]
+
+onnx = [
+    "onnx>=1.15.0",
+    "onnxruntime-gpu>=1.16.0",
+    "pycuda>=2024.1",
+]
+
+torch = [
+    "torch>=2.0.0",
+    "torchvision>=0.24.1"
+]
+
+whisper-trt = [
+    "bbos[torch]",
+    "whisper-trt",
+    "torch2trt",
+    "openai-whisper",
+]
+
+
+[tool.uv.sources]
+torch = { index = "jetson" }
+onnx = { index = "jetson" }
+onnxruntime-gpu = { index = "jetson" }
+onnxslim = { index = "jetson" }
+whisper-trt = { git = "https://github.com/Bracket-Bot-Inc/whisper_trt.git" }
+torch2trt = { git = "https://github.com/Bracket-Bot-Inc/torch2trt.git" }
+openai-whisper = { git = "https://github.com/Bracket-Bot-Inc/whisper.git" }
+[[tool.uv.index]]
+name = "jetson"
+url = "https://pypi.jetson-ai-lab.io/jp6/cu126"
+explicit = true
